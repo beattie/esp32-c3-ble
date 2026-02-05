@@ -1,0 +1,52 @@
+{
+    "name": "ESP-IDF v5.5.2",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "args": {
+            "DOCKER_TAG": "v5.5.2"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "espressif.esp-idf-extension",
+                "ms-vscode.cpptools",
+                "ms-vscode.cmake-tools",
+                "asvetliakov.vscode-neovim"
+            ],
+            "settings": {
+                "idf.espIdfPath": "/opt/esp/idf",
+                "idf.toolsPath": "/opt/esp",
+                "idf.pythonBinPath": "/opt/esp/python_env/idf5.5_py3.12_env/bin/python",
+                "idf.customExtraPaths": "",
+                "idf.openOcdConfigs": [
+                    "board/esp32c3-builtin.cfg"
+                ],
+                "idf.port": "/dev/ttyACM0",
+                "idf.showOnboardingOnInit": false,
+                "C_Cpp.debugShortcut": false,
+                "workbench.startupEditor": "none",
+                "extensions.experimental.affinity": {
+                    "asvetliakov.vscode-neovim": 1
+                },
+                "vscode-neovim.enableSearchHighlight": false,
+                "vscode-neovim.neovimExecutablePaths.linux": "/usr/bin/nvim",
+                "editor.occurrencesHighlight": "off",
+                "editor.selectionHighlight": false,
+                "editor.wordHighlight": false,
+                "editor.wordWrap": "bounded",
+                "editor.rulers": [80],
+                "editor.inlayHints.enabled": "offUnlessPressed",
+                "editor.enablePreview": false,
+                "terminal.integrated.copyOnSelection": true,
+                "workbench.editor.pinnedTabsOnSeparateRow": true,
+                "workbench.editor.enablePreview": false,
+                "workbench.colorTheme": "Default Light+",
+                "debug.toolBarLocation": "docked"
+            }
+        }
+    },
+    "runArgs": [
+        "--privileged"
+    ]
+}

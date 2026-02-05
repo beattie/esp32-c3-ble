@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ESP32-C3 Debug",
+            "type": "gdbtarget",
+            "request": "attach",
+            "gdb": "${command:espIdf.getToolchainGdb}",
+            "program": "${workspaceFolder}/build/${command:espIdf.getProjectName}.elf",
+            "target": "localhost:3333",
+            "stopAtConnect": false,
+            "initCommands": [
+                "set remote hardware-watchpoint-limit 2",
+                "mon reset halt",
+                "maintenance flush register-cache",
+                "thb app_main"
+            ],
+            "preLaunchTask": "OpenOCD"
+        }
+    ]
+}
