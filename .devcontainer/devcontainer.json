@@ -30,7 +30,6 @@
                     "asvetliakov.vscode-neovim": 1
                 },
                 "vscode-neovim.enableSearchHighlight": false,
-                "vscode-neovim.neovimExecutablePaths.linux": "/usr/bin/nvim",
                 "editor.occurrencesHighlight": "off",
                 "editor.selectionHighlight": false,
                 "editor.wordHighlight": false,
