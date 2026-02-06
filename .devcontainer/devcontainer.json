@@ -41,7 +41,9 @@
                 "workbench.editor.pinnedTabsOnSeparateRow": true,
                 "workbench.editor.enablePreview": false,
                 "workbench.colorTheme": "Default Light+",
-                "debug.toolBarLocation": "docked"
+                "debug.toolBarLocation": "docked",
+                "remote.autoForwardPorts": false,
+                "extensions.ignoreRecommendations": true
             }
         }
     },
