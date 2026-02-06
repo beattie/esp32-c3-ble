@@ -3,3 +3,14 @@ managed_components/
 dependencies.lock
 sdkconfig
 sdkconfig.old
+
+# Editor temporaries
+*.swp
+*.swo
+*~
+\#*\#
+.*.kate-swp
+
+# OS temporaries
+.DS_Store
+Thumbs.db
