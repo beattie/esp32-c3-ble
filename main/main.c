@@ -130,6 +130,8 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+    ESP_LOGI(TAG, "starting %s", DEVICE_NAME);
+
     /* Initialise the NimBLE host stack. */
     rc = nimble_port_init();
     assert(rc == 0);
