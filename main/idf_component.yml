@@ -1,0 +1,3 @@
+dependencies:
+  bmx280:
+    git: https://github.com/utkumaden/esp-idf-bmx280.git

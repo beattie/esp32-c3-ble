@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
+#include "bmx280_task.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
@@ -131,6 +132,10 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "starting %s", DEVICE_NAME);
+    
+    if (bmx280_task_init() != ESP_OK) {
+        ESP_LOGW(TAG, "BMX280 sensor not available, continuing without it");
+    }
 
     /* Initialise the NimBLE host stack. */
     rc = nimble_port_init();

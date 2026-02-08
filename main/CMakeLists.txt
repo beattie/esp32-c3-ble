@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "main.c" "gatt_svc.c"
+    SRCS "bmx280_task.c" "main.c" "gatt_svc.c"
     INCLUDE_DIRS "."
     REQUIRES bt nvs_flash driver
 )

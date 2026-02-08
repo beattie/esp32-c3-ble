@@ -9,6 +9,7 @@ Usage:
     python ble_test.py --set-tz -4:30  # set timezone to UTC-4:30
     python ble_test.py --get-tz     # read device timezone
     python ble_test.py --local-time # print device local time (UTC + TZ)
+    python ble_test.py --sensor     # read temperature, pressure, humidity
 """
 
 import argparse
@@ -28,6 +29,9 @@ DEVICE_NAME = "ESP32-C3-BLE"
 CHR_UUID = "deadbeef-1001-2000-3000-aabbccddeeff"
 TIME_UUID = "deadbeef-1005-2000-3000-aabbccddeeff"
 TZ_UUID = "deadbeef-1006-2000-3000-aabbccddeeff"
+PRESS_UUID = "deadbeef-1002-2000-3000-aabbccddeeff"
+TEMP_UUID = "deadbeef-1003-2000-3000-aabbccddeeff"
+HUM_UUID = "deadbeef-1004-2000-3000-aabbccddeeff"
 
 
 async def connect():
@@ -160,6 +164,25 @@ async def local_time():
         print(f"Date:              {dt.strftime('%a %d %b %Y')}")
 
 
+async def read_sensor():
+    """Read temperature, pressure, and humidity from the device."""
+    async with await connect() as client:
+        print(f"Connected: {client.is_connected}")
+
+        data = await client.read_gatt_char(TEMP_UUID)
+        temp = struct.unpack("<f", data)[0]
+
+        data = await client.read_gatt_char(PRESS_UUID)
+        press = struct.unpack("<f", data)[0]
+
+        data = await client.read_gatt_char(HUM_UUID)
+        hum = struct.unpack("<f", data)[0]
+
+        print(f"Temperature: {temp:.2f} °C")
+        print(f"Pressure:    {press / 100.0:.2f} hPa")
+        print(f"Humidity:    {hum:.2f} %")
+
+
 def main():
     parser = argparse.ArgumentParser(description="ESP32-C3-BLE test tool")
     parser.add_argument("--set-time", action="store_true",
@@ -172,9 +195,13 @@ def main():
                         help="read device timezone")
     parser.add_argument("--local-time", action="store_true",
                         help="print device local time (UTC + TZ)")
+    parser.add_argument("--sensor", action="store_true",
+                        help="read temperature, pressure, humidity")
     args = parser.parse_args()
 
-    if args.set_time:
+    if args.sensor:
+        asyncio.run(read_sensor())
+    elif args.set_time:
         asyncio.run(set_time())
     elif args.get_time:
         asyncio.run(get_time())
