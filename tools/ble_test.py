@@ -9,6 +9,7 @@ Usage:
     python ble_test.py --set-tz -4:30  # set timezone to UTC-4:30
     python ble_test.py --get-tz     # read device timezone
     python ble_test.py --local-time # print device local time (UTC + TZ)
+    python ble_test.py --set-local  # set time and timezone from host clock
     python ble_test.py --sensor     # read temperature, pressure, humidity
 """
 
@@ -164,6 +165,33 @@ async def local_time():
         print(f"Date:              {dt.strftime('%a %d %b %Y')}")
 
 
+async def set_local():
+    """Set device time and timezone from the host's local clock."""
+    async with await connect() as client:
+        print(f"Connected: {client.is_connected}")
+
+        # Set UNIX time
+        now = int(time.time())
+        await client.write_gatt_char(TIME_UUID, struct.pack("<q", now))
+        print(f"Time set to {now} ({time.ctime(now)})")
+
+        # Determine host UTC offset in quarter-hours
+        local_dt = datetime.now(timezone.utc).astimezone()
+        utc_offset_sec = local_dt.utcoffset().total_seconds()
+        qh = int(utc_offset_sec // 900)
+        await client.write_gatt_char(TZ_UUID, struct.pack("<b", qh))
+        print(f"Timezone set to {format_tz(qh)} ({qh} quarter-hours)")
+
+        # Read back local time
+        data = await client.read_gatt_char(TIME_UUID)
+        device_time = struct.unpack("<q", data)[0]
+        data = await client.read_gatt_char(TZ_UUID)
+        readback_qh = struct.unpack("<b", data)[0]
+        tz_info = timezone(timedelta(minutes=readback_qh * 15))
+        dt = datetime.fromtimestamp(device_time, tz=tz_info)
+        print(f"Device local time: {dt.strftime('%H:%M:%S %Z')} ({format_tz(readback_qh)})")
+
+
 async def read_sensor():
     """Read temperature, pressure, and humidity from the device."""
     async with await connect() as client:
@@ -195,6 +223,8 @@ def main():
                         help="read device timezone")
     parser.add_argument("--local-time", action="store_true",
                         help="print device local time (UTC + TZ)")
+    parser.add_argument("--set-local", action="store_true",
+                        help="set time and timezone from host clock")
     parser.add_argument("--sensor", action="store_true",
                         help="read temperature, pressure, humidity")
     args = parser.parse_args()
@@ -211,6 +241,8 @@ def main():
         asyncio.run(get_tz())
     elif args.local_time:
         asyncio.run(local_time())
+    elif args.set_local:
+        asyncio.run(set_local())
     else:
         asyncio.run(test_readwrite())
 
