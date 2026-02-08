@@ -241,6 +241,11 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
 
 /* ---- Public API ---------------------------------------------------------- */
 
+int8_t gatt_svc_get_tz_quarter_hours(void)
+{
+    return tz_quarter_hours;
+}
+
 int gatt_svc_init(void)
 {
     int rc;
