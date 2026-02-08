@@ -4,7 +4,7 @@
 #include "nvs_flash.h"
 
 #include "bmx280_task.h"
-#include "clock.h"
+#include "display.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
@@ -138,8 +138,8 @@ void app_main(void)
         ESP_LOGW(TAG, "BMX280 sensor not available, continuing without it");
     }
     
-    if (clock_init() != ESP_OK) {
-        ESP_LOGW(TAG, "Clock display not available, continuing without it");
+    if (display_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Display not available, continuing without it");
     }
 
     /* Initialise the NimBLE host stack. */

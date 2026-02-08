@@ -149,3 +149,17 @@ void oled_show_time(void)
     oled_cmd(0x10);
     oled_data(row, 128);
 }
+
+/* ---- Turn off display -------------------------------------------------- */
+
+void oled_off(void)
+{
+    oled_cmd(0xAE); /* Display OFF */
+}
+
+/* ---- Turn on display --------------------------------------------------- */
+
+void oled_on(void)
+{
+    oled_cmd(0xAF); /* Display ON */
+}

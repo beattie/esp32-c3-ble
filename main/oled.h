@@ -9,4 +9,10 @@ esp_err_t oled_init(void);
 /** Display current system time (24hr HH:MM:SS) on the OLED. */
 void oled_show_time(void);
 
+/** Turn off the OLED display (enters low-power mode). */
+void oled_off(void);
+
+/** Turn on the OLED display. */
+void oled_on(void);
+
 #endif
