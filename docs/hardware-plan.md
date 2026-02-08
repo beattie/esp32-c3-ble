@@ -130,51 +130,92 @@ await asyncio.sleep(30)  # listen for 30s
 await client.stop_notify(TEMP_UUID)
 ```
 
-## Battery Power (Optional)
+## Battery Power
 
-Three options for running untethered, away from USB power.
+### 4x AA Alkaline Pack (recommended)
 
-### Option A: 3x AA/AAA (simplest — no extra modules)
+A 4-cell AA holder wired in series to the board's `5V` and `GND` pins.
 
-Wire a 3x AA holder in series straight to the board's `5V`/`VIN` and `GND`
-pins. Voltage ranges from 4.5V (fresh) to ~3.0V (dead). The onboard 3.3V LDO
-handles regulation. Estimated runtime ~15–20 hours of active BLE on 2000mAh AAs.
+| Battery state | Cell voltage | Pack voltage | ADC pin voltage |
+|---------------|-------------|-------------|-----------------|
+| Fresh         | 1.5V        | 6.0V        | 3.0V            |
+| Nominal       | 1.3V        | 5.2V        | 2.6V            |
+| Low           | 1.1V        | 4.4V        | 2.2V            |
+| Dead          | 1.0V        | 4.0V        | 2.0V            |
 
-```
-3x AA (4.5V) ──► VIN/GND
-```
+The onboard AMS1117-3.3 LDO needs ~1V headroom, so the effective cutoff is
+~4.3V (1.075V/cell). Below this the 3.3V rail will droop and the ESP32-C3 may
+brown out.
 
-### Option B: 2x AA/AAA + boost converter
+Estimated runtime: ~20–30 hours of active BLE on 2000mAh AAs (~60mA average
+draw including BLE advertising + sensor reads).
 
-Use a boost converter module (MT3608 or TPS61200, ~$1) set to 3.3V output,
-wired to the board's `3V3` and `GND` pins. Handles the 3.0V→1.8V range of 2x
-cells. Less efficient than Option A — the converter wastes 10–15% as heat and
-works harder as voltage drops.
+### Battery voltage monitoring
 
-```
-2x AA (3.0V) ──► Boost converter (3.3V out) ──► 3V3/GND
-```
+A resistive voltage divider on **GPIO3 (ADC1_CH3)** scales the pack voltage
+into the ESP32-C3 ADC range (0–3.3V).
 
-### Option C: Li-Po + TP4056 charge module
-
-A single-cell 3.7V Li-Po with a TP4056 charge board (~$1, get the version with
-DW01A protection IC). Rechargeable via USB, smallest form factor.
+**Circuit:**
 
 ```
-USB-C ──► TP4056 B+/B- ──► Li-Po cell
-                 OUT+/OUT- ──► [switch] ──► VIN/GND
+VBAT (4.0–6.0V) ──┬── R1 100kΩ ──┬── R2 100kΩ ──┬── GND
+                   │              │              │
+                   │          GPIO3 (ADC)        │
+                   │                             │
+                  4x AA                         GND
 ```
 
-### Comparison
+**Wiring summary:**
 
-| Setup | Extra HW | Cost | Rechargeable | Notes |
-|-------|----------|------|--------------|-------|
-| 3x AA → VIN | Battery holder only | ~$0.50 | No (unless NiMH) | Simplest |
-| 2x AA + boost | Boost converter | ~$1.50 | No (unless NiMH) | Compact, less efficient |
-| Li-Po + TP4056 | TP4056 module, Li-Po cell | ~$5 | Yes | Smallest, best for permanent install |
+| Connection          | Pin     |
+|---------------------|---------|
+| Battery + → R1 top  | —       |
+| R1/R2 junction      | GPIO3   |
+| R2 bottom            | GND     |
+| Battery +           | 5V pin  |
+| Battery −           | GND pin |
 
-> **Tip:** Add a voltage divider on an ADC pin (GPIO0–GPIO4) to monitor battery
-> level over BLE. Deep sleep gets the ESP32-C3 down to ~5uA between readings for
+**Calculations:**
+
+- Divider ratio: R2 / (R1 + R2) = 100k / 200k = 0.5
+- VBAT = ADC_voltage × 2
+- Quiescent current: 6V / 200kΩ = 30µA (negligible)
+- ADC range: 2.0V (dead) to 3.0V (fresh) — fits within 0–3.3V
+
+**ADC configuration (ESP-IDF):**
+
+```c
+#include "esp_adc/adc_oneshot.h"
+
+// ADC1 channel 3 = GPIO3, 11dB attenuation for 0–3.1V range
+adc_oneshot_chan_cfg_t config = {
+    .atten = ADC_ATTEN_DB_12,
+    .bitwidth = ADC_BITWIDTH_12,
+};
+```
+
+**Voltage-to-SOH mapping (approximate):**
+
+| ADC voltage | Pack voltage | SOH   |
+|------------|-------------|-------|
+| 3.0V       | 6.0V        | 100%  |
+| 2.6V       | 5.2V        | 75%   |
+| 2.2V       | 4.4V        | 25%   |
+| 2.0V       | 4.0V        | 0%    |
+
+> **Note:** Alkaline discharge is non-linear. For better SOH estimates, use a
+> lookup table calibrated against actual cell discharge curves rather than
+> linear interpolation.
+
+### Other battery options
+
+| Setup | Voltage | Extra HW | Rechargeable | Notes |
+|-------|---------|----------|--------------|-------|
+| 4x AA → 5V pin | 6.0–4.0V | Battery holder only | No (unless NiMH) | Recommended |
+| 2x AA + boost | 3.0V → 5V | Boost converter (~$1) | No (unless NiMH) | Compact, less efficient |
+| Li-Po + TP4056 | 3.7V → 5V | TP4056 + boost (~$5) | Yes | Smallest, best for permanent install |
+
+> **Tip:** Deep sleep gets the ESP32-C3 down to ~5µA between readings for
 > long battery life.
 
 ## Checklist
