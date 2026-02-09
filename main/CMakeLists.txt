@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "display.c" "oled.c" "bmx280_task.c" "main.c" "gatt_svc.c"
+    SRCS "display.c" "bmx280_task.c" "main.c" "gatt_svc.c"
     INCLUDE_DIRS "."
-    REQUIRES bt nvs_flash driver
+    REQUIRES bt nvs_flash driver esp_lcd
 )

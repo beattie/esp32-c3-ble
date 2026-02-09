@@ -1,12 +1,9 @@
-#include "driver/i2c.h"
 #include "esp_log.h"
 #include "bmx280.h"
 #include "bmx280_task.h"
+#include "display.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
-#define I2C_SDA_GPIO 5
-#define I2C_SCL_GPIO 6
 
 static const char *TAG = "bmx280_task";
 
@@ -15,7 +12,6 @@ static const char *TAG = "bmx280_task";
 static void bmx280_task(void *param)
 {
     bmx280_t *bmx280 = (bmx280_t *)param;
-    // float temp, press, hum;
 
     while (1) {
         /* Wait for measurement to complete */
@@ -37,21 +33,7 @@ static void bmx280_task(void *param)
 
 esp_err_t bmx280_task_init(void)
 {
-    /* Setup I2C bus (legacy driver) */
-    i2c_config_t i2c_conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_SDA_GPIO,
-        .scl_io_num = I2C_SCL_GPIO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = 100000,
-    };
-
-    ESP_ERROR_CHECK(i2c_param_config(I2C_NUM_0, &i2c_conf));
-    ESP_ERROR_CHECK(i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0));
-    ESP_LOGI(TAG, "I2C initialized on SDA=%d, SCL=%d", I2C_SDA_GPIO, I2C_SCL_GPIO);
-
-    bmx280_t *bmx280 = bmx280_create(I2C_NUM_0);
+    bmx280_t *bmx280 = bmx280_create_master(display_get_i2c_bus());
     if (bmx280 == NULL) {
         ESP_LOGE(TAG, "Failed to create bmx280 instance");
         return ESP_FAIL;

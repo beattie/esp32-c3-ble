@@ -134,12 +134,12 @@ void app_main(void)
 
     ESP_LOGI(TAG, "starting %s", DEVICE_NAME);
     
-    if (bmx280_task_init() != ESP_OK) {
-        ESP_LOGW(TAG, "BMX280 sensor not available, continuing without it");
-    }
-    
     if (display_init() != ESP_OK) {
         ESP_LOGW(TAG, "Display not available, continuing without it");
+    }
+
+    if (bmx280_task_init() != ESP_OK) {
+        ESP_LOGW(TAG, "BMX280 sensor not available, continuing without it");
     }
 
     /* Initialise the NimBLE host stack. */
