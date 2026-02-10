@@ -11,6 +11,7 @@ Usage:
     python ble_test.py --local-time # print device local time (UTC + TZ)
     python ble_test.py --set-local  # set time and timezone from host clock
     python ble_test.py --sensor     # read temperature, pressure, humidity
+    python ble_test.py --battery    # read battery voltage in mV
 """
 
 import argparse
@@ -33,6 +34,7 @@ TZ_UUID = "deadbeef-1006-2000-3000-aabbccddeeff"
 PRESS_UUID = "deadbeef-1002-2000-3000-aabbccddeeff"
 TEMP_UUID = "deadbeef-1003-2000-3000-aabbccddeeff"
 HUM_UUID = "deadbeef-1004-2000-3000-aabbccddeeff"
+BATT_UUID = "deadbeef-1007-2000-3000-aabbccddeeff"
 
 
 async def connect():
@@ -211,6 +213,16 @@ async def read_sensor():
         print(f"Humidity:    {hum:.2f} %")
 
 
+async def read_battery():
+    """Read battery voltage from the device."""
+    async with await connect() as client:
+        print(f"Connected: {client.is_connected}")
+
+        data = await client.read_gatt_char(BATT_UUID)
+        mv = struct.unpack("<I", data)[0] * 2  # voltage divider halves battery voltage
+        print(f"Battery: {mv} mV ({mv / 1000.0:.3f} V)")
+
+
 def main():
     parser = argparse.ArgumentParser(description="ESP32-C3-BLE test tool")
     parser.add_argument("--set-time", action="store_true",
@@ -227,9 +239,13 @@ def main():
                         help="set time and timezone from host clock")
     parser.add_argument("--sensor", action="store_true",
                         help="read temperature, pressure, humidity")
+    parser.add_argument("--battery", action="store_true",
+                        help="read battery voltage in mV")
     args = parser.parse_args()
 
-    if args.sensor:
+    if args.battery:
+        asyncio.run(read_battery())
+    elif args.sensor:
         asyncio.run(read_sensor())
     elif args.set_time:
         asyncio.run(set_time())
