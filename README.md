@@ -6,6 +6,8 @@ The firmware advertises as **ESP32-C3-BLE** with a single custom service contain
 
 ## Quick Start
 
+### Option A: VSCode Dev Container
+
 1. Open this repository in VSCode.
 2. When prompted, **Reopen in Container** (requires Docker).
 3. Build and flash:
@@ -14,6 +16,27 @@ The firmware advertises as **ESP32-C3-BLE** with a single custom service contain
    idf.py set-target esp32c3
    idf.py build
    idf.py flash monitor
+   ```
+
+### Option B: Command Line (devcontainer CLI)
+
+1. Install the [devcontainer CLI](https://github.com/devcontainers/cli):
+
+   ```bash
+   npm install -g @devcontainers/cli
+   ```
+
+2. Start the dev container:
+
+   ```bash
+   devcontainer up --workspace-folder .
+   ```
+
+3. Build and flash:
+
+   ```bash
+   devcontainer exec --workspace-folder . bash -c \
+     "source /opt/esp/idf/export.sh && idf.py build && idf.py -p /dev/ttyACM0 flash"
    ```
 
 4. Scan with a BLE app (e.g. nRF Connect), connect to **ESP32-C3-BLE**, and read/write the characteristic.

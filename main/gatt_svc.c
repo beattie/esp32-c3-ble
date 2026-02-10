@@ -65,6 +65,10 @@ float gatt_svc_pressure;
 float gatt_svc_temperature;
 float gatt_svc_humidity;
 
+/* ---- Battery level ------------------------------------------------------- */
+
+uint32_t gatt_svc_battery_mv;
+
 /* ---- Timezone storage ---------------------------------------------------- */
 /* Timezone offset in quarter-hours from UTC (int8_t, e.g. -20 = UTC-5, +22 = UTC+5:30) */
 static int8_t tz_quarter_hours;

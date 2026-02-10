@@ -3,7 +3,11 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
+#if 0
 #include "bmx280_task.h"
+#else
+#include "sensor_task.h"
+#endif
 #include "display.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
@@ -12,6 +16,7 @@
 #include "services/gap/ble_svc_gap.h"
 
 #include "gatt_svc.h"
+#include "battery.h"
 
 static const char *TAG = "ble_app";
 
@@ -138,9 +143,23 @@ void app_main(void)
         ESP_LOGW(TAG, "Display not available, continuing without it");
     }
 
+#if 0
     if (bmx280_task_init() != ESP_OK) {
         ESP_LOGW(TAG, "BMX280 sensor not available, continuing without it");
     }
+
+    if (battery_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Battery reading not available, continuing without it");
+    } else {
+		int voltage_mv = battery_get_voltage_mv();
+		ESP_LOGI(TAG, "Battery voltage: %d mV", voltage_mv);
+	}
+#else
+    if (sensor_task_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Sensor task initialization failed, continuing without it");
+    }
+#endif
+
 
     /* Initialise the NimBLE host stack. */
     rc = nimble_port_init();

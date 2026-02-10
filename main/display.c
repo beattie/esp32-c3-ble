@@ -1,5 +1,6 @@
 #include "display.h"
-#include "bmx280_task.h"
+#include "bmx280_sensor.h"
+#include "sensor_task.h"
 #include "gatt_svc.h"
 
 #include <string.h>
@@ -24,6 +25,9 @@ static const char *TAG = "display";
 static esp_lcd_panel_handle_t panel;
 static i2c_master_bus_handle_t i2c_bus;
 
+/* ---- Start with display blanked ---------------------------------------- */
+bool blank_display = true;
+
 /* ---- 8x8 font (column-major, LSB = top pixel) -------------------------- */
 
 enum {
@@ -36,6 +40,10 @@ enum {
     GLYPH_hP,
     GLYPH_P,
     GLYPH_a,
+    GLYPH_m,
+    GLYPH_V,
+    GLYPH_R,
+    GLYPH_H,
 };
 
 static const uint8_t font[][8] = {
@@ -58,6 +66,10 @@ static const uint8_t font[][8] = {
     { 0x7F, 0x08, 0x04, 0x04, 0x7f, 0x09, 0x09, 0x06 }, /* hP ligature*/
     { 0x7F, 0x09, 0x09, 0x09, 0x06, 0x00, 0x00, 0x00 }, /* P */
     { 0x20, 0x54, 0x54, 0x54, 0x78, 0x00, 0x00, 0x00 }, /* a */
+    { 0x7C, 0x04, 0x18, 0x04, 0x78, 0x00, 0x00, 0x00 }, /* m */
+    { 0x1F, 0x20, 0x40, 0x20, 0x1F, 0x00, 0x00, 0x00 }, /* V */
+    { 0x7F, 0x09, 0x19, 0x29, 0x46, 0x00, 0x00, 0x00 }, /* R */
+    { 0x7F, 0x08, 0x08, 0x08, 0x7F, 0x00, 0x00, 0x00 }, /* H */
 };
 
 /* ---- Framebuffer -------------------------------------------------------- */
@@ -105,6 +117,11 @@ static void render_display(void)
 
     fb_clear();
 
+    if (blank_display) {
+        fb_flush();
+        return;
+    }
+
     /* Page 3: HH:MM:SS */
     int clock[] = {
         tm.tm_hour / 10, tm.tm_hour % 10, GLYPH_COLON,
@@ -113,7 +130,12 @@ static void render_display(void)
     };
     fb_draw_line(3, 32, clock, 8);
 
-    /* Page 5: XXXX.XXhPa — pressure in hPa */
+    if (!sensors_valid) {
+        fb_flush();
+        return;
+    }
+
+    /* Page 4: XXXX.XXhPa — pressure in hPa */
     int press_hpa = (int)(gatt_svc_pressure / 100.0f);
     int press_dec = (int)(gatt_svc_pressure / 1.0f) % 100;
     if (press_dec < 0) press_dec = -press_dec;
@@ -124,9 +146,9 @@ static void render_display(void)
         press_dec / 10, press_dec % 10,
         GLYPH_hP, GLYPH_a
     };
-    fb_draw_line(5, 28, pressure, 9);
+    fb_draw_line(4, 28, pressure, 9);
 
-    /* Page 6: */
+    /* Page 5: */
 #ifdef DISPLAY_SHOW_FAHRENHEIT
     /* XXX°F — temperature converted from °C */
     float temp_f = gatt_svc_temperature * 9.0f / 5.0f + 32.0f;
@@ -136,7 +158,7 @@ static void render_display(void)
         GLYPH_DEG, GLYPH_F,
     };
 
-    fb_draw_line(6, 28, temp, 5);
+    fb_draw_line(5, 28, temp, 5);
 #else
     /* XX.X°C — temperature in °C with 0.1° resolution */
     int tc = (int)(gatt_svc_temperature * 10.0f);
@@ -145,15 +167,25 @@ static void render_display(void)
         GLYPH_DEG, GLYPH_C,
     };
 
-    fb_draw_line(6, 28, temp, 6);
+    fb_draw_line(5, 28, temp, 6);
 #endif
 
-    /* Page 7: XX% — humidity */
+    /* Page 6: XX%RH — humidity */
     int hum = (int)gatt_svc_humidity;
     int humidity[] = {
-        hum / 10 % 10, hum % 10, GLYPH_PCT,
+        hum / 10 % 10, hum % 10, GLYPH_PCT, GLYPH_R, GLYPH_H
     };
-    fb_draw_line(7, 28, humidity, 3);
+    fb_draw_line(6, 28, humidity, 5);
+
+    /* Page 7: Battery voltage in mV */
+    int battery_mv = gatt_svc_battery_mv * 2; // Assuming a voltage divider
+                                              // that halves the battery voltage
+    int battery[] = {
+        battery_mv / 1000 % 10, battery_mv / 100 % 10,
+        battery_mv / 10 % 10, battery_mv % 10,
+        GLYPH_m, GLYPH_V
+    };
+    fb_draw_line(7, 28, battery, 6);
 
     fb_flush();
 }
@@ -218,6 +250,8 @@ esp_err_t display_init(void)
     uint8_t vcomh = 0x40;
     esp_lcd_panel_io_tx_param(io_handle, 0xDB, &vcomh, 1);
     ESP_LOGI(TAG, "SSD1306 initialized via esp_lcd");
+
+    blank_display = false; /* Start with display active */
 
     xTaskCreate(display_task, "display_task", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);
     return ESP_OK;
