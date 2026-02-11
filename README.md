@@ -41,6 +41,32 @@ The firmware advertises as **ESP32-C3-BLE** with a single custom service contain
 
 4. Scan with a BLE app (e.g. nRF Connect), connect to **ESP32-C3-BLE**, and read/write the characteristic.
 
+### Option C: Command Line (avoid devcontainer CLI)
+
+1. Find the docker container:
+
+   ```bash
+   docker ps -a
+   ```
+
+2. Start the docker container:
+
+   ```bash
+   docker start <container>
+   ```
+
+3. Build:
+
+   ```bash
+   docker exec <container> bash -c "source /opt/esp/idf/export.sh && cd /workspaces/esp32-c3-ble && idf.py build"
+   ```
+
+4. Build and flash:
+
+    ```bash
+    docker exec <container> bash -c "source /opt/esp/idf/export.sh && cd /workspaces/esp32-c3-ble && idf.py build && idf.py -p /dev/ttyACM0 flash"
+    ```
+
 ## Debugging (JTAG)
 
 The AITRIP ESP32-C3 board exposes a built-in USB-JTAG interface. Press **F5** in VSCode to start a debug session — OpenOCD connects via the built-in JTAG and GDB breaks at `app_main`.
@@ -68,4 +94,4 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 
 - ESP32-C3 with 4 MB flash
 - Built-in USB-CDC/JTAG on the USB-C port (appears as `/dev/ttyACM0`)
-- 0.96" SSD1306 OLED (not used by this firmware — a good next step)
+- 0.96" SSD1306 OLED
