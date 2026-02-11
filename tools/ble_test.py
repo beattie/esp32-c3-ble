@@ -12,6 +12,9 @@ Usage:
     python ble_test.py --set-local  # set time and timezone from host clock
     python ble_test.py --sensor     # read temperature, pressure, humidity
     python ble_test.py --battery    # read battery voltage in mV
+    python ble_test.py --display-mode normal  # set display mode
+    python ble_test.py --display-mode button  # display on button press (5s)
+    python ble_test.py --display-mode blank   # blank display
 """
 
 import argparse
@@ -35,6 +38,9 @@ PRESS_UUID = "deadbeef-1002-2000-3000-aabbccddeeff"
 TEMP_UUID = "deadbeef-1003-2000-3000-aabbccddeeff"
 HUM_UUID = "deadbeef-1004-2000-3000-aabbccddeeff"
 BATT_UUID = "deadbeef-1007-2000-3000-aabbccddeeff"
+MODE_UUID = "deadbeef-1008-2000-3000-aabbccddeeff"
+
+DISPLAY_MODES = {"normal": 0, "button": 1, "blank": 2}
 
 
 async def connect():
@@ -223,6 +229,21 @@ async def read_battery():
         print(f"Battery: {mv} mV ({mv / 1000.0:.3f} V)")
 
 
+async def set_display_mode(mode_name):
+    """Set the display mode on the device."""
+    mode = DISPLAY_MODES[mode_name]
+    async with await connect() as client:
+        print(f"Connected: {client.is_connected}")
+
+        await client.write_gatt_char(MODE_UUID, struct.pack("<B", mode))
+        print(f"Display mode set to '{mode_name}' ({mode})")
+
+        data = await client.read_gatt_char(MODE_UUID)
+        readback = struct.unpack("<B", data)[0]
+        names = {v: k for k, v in DISPLAY_MODES.items()}
+        print(f"Readback: '{names.get(readback, '?')}' ({readback})")
+
+
 def main():
     parser = argparse.ArgumentParser(description="ESP32-C3-BLE test tool")
     parser.add_argument("--set-time", action="store_true",
@@ -241,9 +262,14 @@ def main():
                         help="read temperature, pressure, humidity")
     parser.add_argument("--battery", action="store_true",
                         help="read battery voltage in mV")
+    parser.add_argument("--display-mode", choices=DISPLAY_MODES.keys(),
+                        metavar="MODE",
+                        help="set display mode: normal, button, blank")
     args = parser.parse_args()
 
-    if args.battery:
+    if args.display_mode:
+        asyncio.run(set_display_mode(args.display_mode))
+    elif args.battery:
         asyncio.run(read_battery())
     elif args.sensor:
         asyncio.run(read_sensor())
