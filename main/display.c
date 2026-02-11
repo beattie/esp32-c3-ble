@@ -2,6 +2,7 @@
 #include "bmx280_sensor.h"
 #include "sensor_task.h"
 #include "gatt_svc.h"
+#include "button.h"
 
 #include <string.h>
 #include <sys/time.h>
@@ -11,6 +12,7 @@
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_vendor.h"
+#include "esp_timer.h"
 #include "driver/i2c_master.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -24,9 +26,6 @@
 static const char *TAG = "display";
 static esp_lcd_panel_handle_t panel;
 static i2c_master_bus_handle_t i2c_bus;
-
-/* ---- Start with display blanked ---------------------------------------- */
-bool blank_display = true;
 
 /* ---- 8x8 font (column-major, LSB = top pixel) -------------------------- */
 
@@ -104,6 +103,19 @@ static void fb_draw_line(int page, int start_col, const int *glyphs, int count)
     }
 }
 
+/* ---- Display on or off -------------------------------------------------- */
+
+void display_set_enabled(bool enabled)
+{
+    if (enabled) {
+        ESP_LOGD(TAG, "Display enabled");
+        esp_lcd_panel_disp_on_off(panel, true);
+    } else {
+        ESP_LOGD(TAG, "Display disabled");
+        esp_lcd_panel_disp_on_off(panel, false);
+    }
+}
+
 /* ---- Display rendering -------------------------------------------------- */
 
 static void render_display(void)
@@ -117,10 +129,36 @@ static void render_display(void)
 
     fb_clear();
 
-    if (blank_display) {
-        fb_flush();
-        return;
+    switch (gatt_svc_display_mode) {
+        case DISPLAY_MODE_BLANK:
+            /* Don't draw anything, just clear the display */
+            ESP_LOGD(TAG, "Display mode: BLANK");
+            fb_flush();
+            display_set_enabled(false);
+            return;
+
+        case DISPLAY_MODE_BUTTON: {
+            int64_t uptime = esp_timer_get_time();
+            if (uptime - button_time > 5 * 1000000) {
+                ESP_LOGD(TAG,
+                        "Display mode: BUTTON (last press %lld seconds ago)",
+                        (uptime - button_time) / 1000000);
+                display_set_enabled(false);
+                fb_flush();
+                return;
+            }
+            ESP_LOGI(TAG, "Display mode: BUTTON (last press %lld seconds ago)",
+                        (uptime - button_time) / 1000000);
+            break;
+        }
+
+        case DISPLAY_MODE_NORMAL:
+            ESP_LOGD(TAG, "Display mode: NORMAL");
+        default:
+            /* Normal mode: always show sensor readings */
+            break;
     }
+    display_set_enabled(true);
 
     /* Page 3: HH:MM:SS */
     int clock[] = {
@@ -250,8 +288,6 @@ esp_err_t display_init(void)
     uint8_t vcomh = 0x40;
     esp_lcd_panel_io_tx_param(io_handle, 0xDB, &vcomh, 1);
     ESP_LOGI(TAG, "SSD1306 initialized via esp_lcd");
-
-    blank_display = false; /* Start with display active */
 
     xTaskCreate(display_task, "display_task", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);
     return ESP_OK;

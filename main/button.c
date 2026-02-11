@@ -1,0 +1,34 @@
+#include "button.h"
+#include "driver/gpio.h"
+#include "esp_attr.h"
+#include "esp_timer.h"
+
+#define BUTTON_GPIO 9
+
+/* ---- Time Stamp for Button Press ----------------------------------------- */
+
+volatile int64_t button_time = 0; // Time of last button press in microseconds
+
+/* ---- Button interrupt handler -------------------------------------------- */
+
+static void IRAM_ATTR button_isr_handler(void *arg)
+{
+    (void)arg;
+    button_time = esp_timer_get_time();
+}   
+
+/* ---- Button initialization ------------------------------------------------ */
+void button_init(void)
+{
+    gpio_config_t io_conf = {
+        .intr_type = GPIO_INTR_NEGEDGE, // Trigger on falling edge (button press)
+        .mode = GPIO_MODE_INPUT,
+        .pin_bit_mask = (1ULL << BUTTON_GPIO),
+        .pull_up_en = GPIO_PULLUP_ENABLE, // Enable internal pull-up resistor
+    };
+    gpio_config(&io_conf);
+
+    // Install ISR service and add handler for the button GPIO
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(BUTTON_GPIO, button_isr_handler, (void *)BUTTON_GPIO);
+}

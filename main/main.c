@@ -17,6 +17,7 @@
 
 #include "gatt_svc.h"
 #include "battery.h"
+#include "button.h"
 
 static const char *TAG = "ble_app";
 
@@ -139,6 +140,8 @@ void app_main(void)
 
     ESP_LOGI(TAG, "starting %s", DEVICE_NAME);
     
+    button_init();
+
     if (display_init() != ESP_OK) {
         ESP_LOGW(TAG, "Display not available, continuing without it");
     }

@@ -56,6 +56,10 @@ static const ble_uuid128_t chr_batt_uuid =
     BLE_UUID128_INIT(0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x00, 0x30,
                      0x00, 0x20, 0x07, 0x10, 0xef, 0xbe, 0xad, 0xde);
 
+static const ble_uuid128_t chr_mode_uuid =
+    BLE_UUID128_INIT(0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x00, 0x30,
+                     0x00, 0x20, 0x08, 0x10, 0xef, 0xbe, 0xad, 0xde);
+
 /* ---- Characteristic value storage ---------------------------------------- */
 
 #define CHR_VAL_MAX_LEN 64
@@ -73,6 +77,10 @@ float gatt_svc_humidity;
 /* ---- Battery level ------------------------------------------------------- */
 
 uint32_t gatt_svc_battery_mv;
+
+/* ---- Display mode -------------------------------------------------------- */
+
+uint8_t gatt_svc_display_mode;
 
 /* ---- Timezone storage ---------------------------------------------------- */
 /* Timezone offset in quarter-hours from UTC (int8_t, e.g. -20 = UTC-5, +22 = UTC+5:30) */
@@ -183,6 +191,39 @@ static int batt_access_cb(uint16_t conn_handle, uint16_t attr_handle,
     return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
+/* ---- Display mode access callback ---------------------------------------- */
+
+static int display_mode_access_cb(uint16_t conn_handle, uint16_t attr_handle,
+                                   struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    int rc;
+
+    switch (ctxt->op) {
+    case BLE_GATT_ACCESS_OP_READ_CHR:
+        rc = os_mbuf_append(ctxt->om, &gatt_svc_display_mode, sizeof(gatt_svc_display_mode));
+        return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+
+    case BLE_GATT_ACCESS_OP_WRITE_CHR: {
+        uint16_t om_len = OS_MBUF_PKTLEN(ctxt->om);
+        if (om_len != sizeof(uint8_t)) {
+            return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+        }
+        uint8_t val;
+        uint16_t flat_len;
+        rc = ble_hs_mbuf_to_flat(ctxt->om, &val, sizeof(val), &flat_len);
+        if (rc != 0) {
+            return BLE_ATT_ERR_UNLIKELY;
+        }
+        gatt_svc_display_mode = val;
+        ESP_LOGI(TAG, "display mode set to %u", val);
+        return 0;
+    }
+
+    default:
+        return BLE_ATT_ERR_UNLIKELY;
+    }
+}
+
 /* ---- Timezone access callback -------------------------------------------- */
 
 static int tz_access_cb(uint16_t conn_handle, uint16_t attr_handle,
@@ -258,6 +299,11 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
             {
                 .uuid = &chr_tz_uuid.u,
                 .access_cb = tz_access_cb,
+                .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE,
+            },
+            {
+                .uuid = &chr_mode_uuid.u,
+                .access_cb = display_mode_access_cb,
                 .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE,
             },
             {0}, /* terminator */
