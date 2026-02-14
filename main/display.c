@@ -234,7 +234,7 @@ static void display_task(void *param)
 {
     while (1) {
         render_display();
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 
@@ -280,7 +280,7 @@ esp_err_t display_init(void)
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
     ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, true, true));
-    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
+    //ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
     uint8_t contrast = 0xFF;
     esp_lcd_panel_io_tx_param(io_handle, 0x81, &contrast, 1);
     uint8_t precharge = 0xF1;

@@ -18,6 +18,7 @@
 #include "gatt_svc.h"
 #include "battery.h"
 #include "button.h"
+#include "power.h"
 
 static const char *TAG = "ble_app";
 
@@ -54,6 +55,8 @@ static void start_advertising(void)
     memset(&adv_params, 0, sizeof(adv_params));
     adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
     adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
+    adv_params.itvl_min = 3200; /* 2000ms in 0.625ms units */
+    adv_params.itvl_max = 3200;
 
     rc = ble_gap_adv_start(BLE_OWN_ADDR_PUBLIC, NULL, BLE_HS_FOREVER,
                            &adv_params, gap_event_handler, NULL);
@@ -146,22 +149,9 @@ void app_main(void)
         ESP_LOGW(TAG, "Display not available, continuing without it");
     }
 
-#if 0
-    if (bmx280_task_init() != ESP_OK) {
-        ESP_LOGW(TAG, "BMX280 sensor not available, continuing without it");
-    }
-
-    if (battery_init() != ESP_OK) {
-        ESP_LOGW(TAG, "Battery reading not available, continuing without it");
-    } else {
-		int voltage_mv = battery_get_voltage_mv();
-		ESP_LOGI(TAG, "Battery voltage: %d mV", voltage_mv);
-	}
-#else
     if (sensor_task_init() != ESP_OK) {
         ESP_LOGW(TAG, "Sensor task initialization failed, continuing without it");
     }
-#endif
 
 
     /* Initialise the NimBLE host stack. */
@@ -182,4 +172,10 @@ void app_main(void)
 
     /* Start the NimBLE host task. */
     nimble_port_freertos_init(nimble_host_task);
+    
+    /* Initialize power management */
+    if (power_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Power management initialization failed, continuing "
+            "without it");
+    }
 }

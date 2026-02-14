@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include "esp_pm.h"
+
 #include "esp_log.h"
 #include "sensor_task.h"
 #include "bmx280.h"
@@ -41,7 +44,7 @@ static void sensor_task(void *param)
         gatt_svc_battery_mv = battery_get_voltage_mv(); // Update battery 
                                                         // voltage reading
         
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 

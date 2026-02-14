@@ -1,4 +1,5 @@
 #include "gatt_svc.h"
+#include "display.h"
 
 #include <string.h>
 #include <sys/time.h>
@@ -80,7 +81,7 @@ uint32_t gatt_svc_battery_mv;
 
 /* ---- Display mode -------------------------------------------------------- */
 
-uint8_t gatt_svc_display_mode;
+uint8_t gatt_svc_display_mode = DISPLAY_MODE_BLANK;
 
 /* ---- Timezone storage ---------------------------------------------------- */
 /* Timezone offset in quarter-hours from UTC (int8_t, e.g. -20 = UTC-5, +22 = UTC+5:30) */
