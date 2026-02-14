@@ -4,6 +4,10 @@
 
 The device runs at ~60-80mA continuously (BLE advertising + OLED + sensors), draining 4x AA batteries in ~2 days. Adding automatic light sleep and a deep sleep "power off" mode will dramatically improve battery life.
 
+### Baseline
+
+Testing battery life on the unoptimized code. Running time with the display off, was 48+ hours, failing with a reading of 3.5V and a DVM reading of 3.8V.
+
 ## Two Features
 
 ### 1. Automatic Light Sleep (always active)
@@ -18,7 +22,7 @@ The device runs at ~60-80mA continuously (BLE advertising + OLED + sensors), dra
 - Triggered by 3-second long button press or BLE command
 - Device enters deep sleep (~5µA), OLED off, all peripherals reset
 - Two wakeup variants via `#ifdef DEEP_SLEEP_WAKEUP_GPIO`:
-  - **Defined** (e.g. GPIO3): button on RTC GPIO wakes device
+  - **Defined** (e.g. GPIO2): button on RTC GPIO wakes device
   - **Not defined** (GPIO9 only): timer wakeup every 5min, advertise 10s, sleep again
 
 ## Files to Create
@@ -69,7 +73,7 @@ Then delete `sdkconfig` and run `idf.py reconfigure`.
 ### `main/CMakeLists.txt`
 
 - Add `power.c` to SRCS, `esp_pm` to REQUIRES
-- Commented-out `target_compile_definitions` for `DEEP_SLEEP_WAKEUP_GPIO=3`
+- Commented-out `target_compile_definitions` for `DEEP_SLEEP_WAKEUP_GPIO=2`
 
 ### `tools/ble_test.py` — Add `--deep-sleep` flag
 
