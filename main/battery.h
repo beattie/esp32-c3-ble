@@ -5,5 +5,6 @@
 
 esp_err_t battery_init(void);
 int battery_get_voltage_mv(void);
+int button_read_mv(void);
 
 #endif /* BATTERY_H */

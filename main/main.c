@@ -144,6 +144,7 @@ void app_main(void)
     ESP_LOGI(TAG, "starting %s", DEVICE_NAME);
     
     button_init();
+    battery_init();
 
     if (display_init() != ESP_OK) {
         ESP_LOGW(TAG, "Display not available, continuing without it");

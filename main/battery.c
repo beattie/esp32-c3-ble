@@ -9,6 +9,7 @@ static const char *TAG = "battery";
 
 #define ADC_UNIT ADC_UNIT_1
 #define ADC_CHANNEL ADC_CHANNEL_3
+#define BUTTON_ADC_CHANNEL ADC_CHANNEL_4
 
 // ADC Attenuation
 #define ADC_ATTENUATION ADC_ATTEN_DB_12 // Changed from ADC_ATTEN_DB_11 to ADC_ATTEN_DB_12
@@ -50,6 +51,7 @@ esp_err_t battery_init(void)
         .atten = ADC_ATTENUATION,
     };
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, BUTTON_ADC_CHANNEL, &config));
 
     // ADC calibration
     if (!adc_calibration_init(ADC_UNIT, ADC_ATTENUATION, &adc_cali_handle)) {
@@ -72,6 +74,17 @@ int battery_get_voltage_mv(void)
         // This is not accurate. For better accuracy, use esp_adc_cal.
         voltage_mv = raw_val * 2500 / 4095;
         ESP_LOGW(TAG, "ADC calibration not enabled, using linear conversion. Voltage: %d mV", voltage_mv);
+    }
+    return voltage_mv;
+}
+
+int button_read_mv(void)
+{
+    int raw_val;
+    ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, BUTTON_ADC_CHANNEL, &raw_val));
+    int voltage_mv = 0;
+    if (adc_cali_handle) {
+        ESP_ERROR_CHECK(adc_cali_raw_to_voltage(adc_cali_handle, raw_val, &voltage_mv));
     }
     return voltage_mv;
 }

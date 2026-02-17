@@ -232,9 +232,20 @@ static void render_display(void)
 
 static void display_task(void *param)
 {
+    int count = 0;
+    int64_t last_button = button_time;
+    
     while (1) {
-        render_display();
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        button_poll(); /* Update button state */
+        if (button_time != last_button) {
+            last_button = button_time;
+            render_display();
+            count = 0;
+        } else if (++count >= 50) {
+            render_display();
+            count = 0;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100)); // Delay for 100ms
     }
 }
 

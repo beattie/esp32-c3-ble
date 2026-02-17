@@ -90,8 +90,34 @@ EOF
 sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
+## Light Sleep and GPIO
+
+This project uses automatic light sleep for power saving (~18-21mA average vs ~60-80mA without). Light sleep introduces several GPIO issues on the ESP32-C3:
+
+### GPIO Outputs Glitch During Sleep Transitions
+
+GPIO output pins lose their state during light sleep entry/exit, causing visible glitching (e.g. LEDs flickering). The fix is `gpio_hold_en()` to latch the output state:
+
+```c
+gpio_hold_dis(pin);       // release latch
+gpio_set_level(pin, val); // change state
+gpio_hold_en(pin);        // re-latch
+```
+
+### Button Input via ADC
+
+The button on GPIO4 is read using ADC (`adc_oneshot_read()` on ADC1_CHANNEL_4) rather than `gpio_get_level()`. During testing, digital GPIO reads appeared unreliable during light sleep, but this may have been a misdiagnosis caused by the GPIO output glitching described above. The LED was flickering due to `gpio_hold_en()` not being used, which made every button detection approach appear to fail. ADC reads (threshold: <1500mV = pressed, ~2888mV = open with internal pull-up) work reliably and were kept as the solution.
+
+Digital GPIO reads with `gpio_hold_en()` on the LED output have not been re-tested and may work fine. GPIO interrupts (both edge and level triggered) are known to fire spuriously during sleep transitions regardless.
+
+### USB-CDC/JTAG Incompatible with Light Sleep
+
+The built-in USB-Serial/JTAG peripheral cannot respond to host USB polls during light sleep, causing disconnection and enumeration failures. Workaround: hold BOOT button while plugging in to enter download mode for flashing. A 5-second delay in `power_init()` provides a window for `idf.py monitor` to attach before light sleep activates.
+
 ## Notes on the AITRIP Board
 
 - ESP32-C3 with 4 MB flash
 - Built-in USB-CDC/JTAG on the USB-C port (appears as `/dev/ttyACM0`)
 - 0.96" SSD1306 OLED
+- Blue LED on GPIO8
+- BOOT button on GPIO9

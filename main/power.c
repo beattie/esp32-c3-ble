@@ -2,6 +2,8 @@
 
 #include "esp_log.h"
 #include "esp_pm.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "power";
 esp_err_t power_init(void)
@@ -12,6 +14,9 @@ esp_err_t power_init(void)
         .min_freq_mhz = 40,
         .light_sleep_enable = true,
     };
+
+    ESP_LOGI(TAG, "Waiting 5 seconds before enabling power management to allow initial setup...");
+    vTaskDelay(pdMS_TO_TICKS(5000));
 
     esp_err_t err = esp_pm_configure(&pm_config);
     if (err != ESP_OK) {

@@ -53,7 +53,7 @@ static void sensor_task(void *param)
 esp_err_t sensor_task_init(void)
 {
     bmx280_sensor_init(); // Initialize the sensor (e.g., I2C setup, sensor config)
-    battery_init(); // Initialize battery reading (e.g., ADC setup)
+    // battery_init() called earlier in app_main before display_init
     
     xTaskCreate(sensor_task, "sensor_task", 4096, NULL, 5, NULL);
     return ESP_OK;
