@@ -139,7 +139,7 @@ static void render_display(void)
 
         case DISPLAY_MODE_BUTTON: {
             int64_t uptime = esp_timer_get_time();
-            if (uptime - button_time > 5 * 1000000) {
+            if (uptime - button_time > 60 * 1000000) {
                 ESP_LOGD(TAG,
                         "Display mode: BUTTON (last press %lld seconds ago)",
                         (uptime - button_time) / 1000000);
@@ -241,11 +241,11 @@ static void display_task(void *param)
             last_button = button_time;
             render_display();
             count = 0;
-        } else if (++count >= 50) {
+        } else if (++count >= 3) {
             render_display();
             count = 0;
         }
-        vTaskDelay(pdMS_TO_TICKS(100)); // Delay for 100ms
+        vTaskDelay(pdMS_TO_TICKS(2000)); // Delay for 2000ms
     }
 }
 
