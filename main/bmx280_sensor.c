@@ -27,7 +27,8 @@ esp_err_t bmx280_sensor_init(void)
 
     bmx280_config_t config = BMX280_DEFAULT_CONFIG;
     ESP_ERROR_CHECK(bmx280_configure(bmx280, &config));
-    ESP_ERROR_CHECK(bmx280_setMode(bmx280, BMX280_MODE_CYCLE));
+    /* Start in sleep mode; sensor_task triggers forced reads on demand */
+    ESP_ERROR_CHECK(bmx280_setMode(bmx280, BMX280_MODE_SLEEP));
 
     return ESP_OK;
 }

@@ -105,8 +105,11 @@ static void fb_draw_line(int page, int start_col, const int *glyphs, int count)
 
 /* ---- Display on or off -------------------------------------------------- */
 
+static bool display_is_on = false;
+
 void display_set_enabled(bool enabled)
 {
+    display_is_on = enabled;
     if (enabled) {
         ESP_LOGD(TAG, "Display enabled");
         esp_lcd_panel_disp_on_off(panel, true);
@@ -234,7 +237,7 @@ static void display_task(void *param)
 {
     int count = 0;
     int64_t last_button = button_time;
-    
+
     while (1) {
         button_poll(); /* Update button state */
         if (button_time != last_button) {
@@ -245,7 +248,9 @@ static void display_task(void *param)
             render_display();
             count = 0;
         }
-        vTaskDelay(pdMS_TO_TICKS(2000)); // Delay for 2000ms
+        /* Poll faster when display is on for responsive timeout,
+         * slower when off to save power (fewer CPU wakeups) */
+        vTaskDelay(pdMS_TO_TICKS(display_is_on ? 2000 : 5000));
     }
 }
 

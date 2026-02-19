@@ -25,6 +25,8 @@ static void sensor_task(void *param)
         bmx280_t *bmx = bmx280_sensor_get_handle();
         if (!bmx) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
 
+        /* Trigger a one-shot measurement (sensor sleeps between reads) */
+        bmx280_setMode(bmx, BMX280_MODE_FORCE);
         do {
             vTaskDelay(pdMS_TO_TICKS(100));
         } while (bmx280_isSampling(bmx));
@@ -34,7 +36,7 @@ static void sensor_task(void *param)
             gatt_svc_temperature = temperature;
             gatt_svc_pressure = pressure;
             gatt_svc_humidity = humidity;
-            ESP_LOGI(TAG, "Temperature: %.2f °C, Pressure: %.2f hPa, Humidity: %.2f %%", temperature, pressure / 100.0, humidity);
+            ESP_LOGD(TAG, "Temperature: %.2f °C, Pressure: %.2f hPa, Humidity: %.2f %%", temperature, pressure / 100.0, humidity);
             
             sensors_valid = true; // Mark sensor readings as valid
         } else {
@@ -44,7 +46,7 @@ static void sensor_task(void *param)
         gatt_svc_battery_mv = battery_get_voltage_mv(); // Update battery 
                                                         // voltage reading
         
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        vTaskDelay(pdMS_TO_TICKS(30000));
     }
 }
 
