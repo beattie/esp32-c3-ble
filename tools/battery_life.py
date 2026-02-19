@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import csv
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -26,16 +27,52 @@ import struct
 
 DEVICE_NAME = "ESP32-C3-BLE"
 BATT_UUID = "deadbeef-1007-2000-3000-aabbccddeeff"
+TEMP_UUID = "deadbeef-1003-2000-3000-aabbccddeeff"
+PRESS_UUID = "deadbeef-1002-2000-3000-aabbccddeeff"
+HUM_UUID = "deadbeef-1004-2000-3000-aabbccddeeff"
+
+BT_SCAN_TIMEOUT = 30
+BT_CONNECT_TIMEOUT = 30
 
 
-async def read_battery_mv():
-    """Connect, read battery voltage, disconnect."""
-    device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
+def ts_now():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def restart_bluetooth():
+    """Restart the BlueZ bluetooth service to clear stale state."""
+    print(f"[{ts_now()}] Restarting bluetooth service...")
+    try:
+        subprocess.run(["sudo", "systemctl", "restart", "bluetooth"],
+                       timeout=30, check=True,
+                       capture_output=True)
+        time.sleep(3)  # give BlueZ time to settle
+        print(f"[{ts_now()}] Bluetooth restarted.")
+    except Exception as e:
+        print(f"[{ts_now()}] Failed to restart bluetooth: {e}")
+
+
+async def read_sensors():
+    """Connect, read battery and sensors, disconnect.
+    Returns (mv, temp_c, press_hpa, humidity) or None on failure."""
+    device = await BleakScanner.find_device_by_name(
+        DEVICE_NAME, timeout=BT_SCAN_TIMEOUT)
     if not device:
         return None
-    async with BleakClient(device) as client:
+    async with BleakClient(device, timeout=BT_CONNECT_TIMEOUT) as client:
         data = await client.read_gatt_char(BATT_UUID)
-        return struct.unpack("<I", data)[0] * 2  # voltage divider
+        mv = struct.unpack("<I", data)[0] * 2  # voltage divider
+
+        data = await client.read_gatt_char(TEMP_UUID)
+        temp = struct.unpack("<f", data)[0]
+
+        data = await client.read_gatt_char(PRESS_UUID)
+        press = struct.unpack("<f", data)[0] / 100.0  # Pa to hPa
+
+        data = await client.read_gatt_char(HUM_UUID)
+        hum = struct.unpack("<f", data)[0]
+
+        return mv, temp, press, hum
 
 
 def main():
@@ -52,37 +89,59 @@ def main():
     f = open(args.output, "a", newline="")
     writer = csv.writer(f)
     if not file_exists:
-        writer.writerow(["timestamp", "elapsed_min", "mv", "volts"])
+        writer.writerow(["timestamp", "elapsed_min", "mv", "volts",
+                         "temp_c", "press_hpa", "humidity"])
         f.flush()
+
+    if os.geteuid() != 0:
+        print("Warning: not running as root — bluetooth auto-restart "
+              "requires sudo")
 
     start = time.time()
     reading = 0
+    consecutive_errors = 0
+    last_bt_restart = 0
     print(f"Logging to {args.output} every {args.interval}s"
           + (f", cutoff {args.cutoff} mV" if args.cutoff else ""))
 
     try:
         while True:
+            # Restart bluetooth periodically (every 6 hours) or after
+            # consecutive failures to prevent BlueZ from hanging
+            now = time.time()
+            if consecutive_errors >= 3 or (now - last_bt_restart > 6 * 3600):
+                if last_bt_restart > 0 or consecutive_errors >= 3:
+                    restart_bluetooth()
+                last_bt_restart = now
+
             try:
-                mv = asyncio.run(read_battery_mv())
+                result = asyncio.run(read_sensors())
             except Exception as e:
-                print(f"  BLE error: {e}")
-                time.sleep(args.interval)
+                consecutive_errors += 1
+                print(f"[{ts_now()}] BLE error ({consecutive_errors}): {e}")
+                time.sleep(min(args.interval, 60))
                 continue
 
-            if mv is None:
-                print(f"  Device not found, retrying in {args.interval}s...")
-                time.sleep(args.interval)
+            if result is None:
+                consecutive_errors += 1
+                print(f"[{ts_now()}] Device not found ({consecutive_errors}), retrying...")
+                time.sleep(min(args.interval, 60))
                 continue
 
+            mv, temp, press, hum = result
+            consecutive_errors = 0
             reading += 1
             elapsed = (time.time() - start) / 60.0
             volts = mv / 1000.0
-            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ts = ts_now()
 
-            writer.writerow([ts, f"{elapsed:.1f}", mv, f"{volts:.3f}"])
+            writer.writerow([ts, f"{elapsed:.1f}", mv, f"{volts:.3f}",
+                             f"{temp:.2f}", f"{press:.2f}", f"{hum:.1f}"])
             f.flush()
 
-            print(f"[{ts}] #{reading}  {elapsed:6.1f} min  {mv} mV  {volts:.3f} V")
+            print(f"[{ts}] #{reading}  {elapsed:6.1f} min  "
+                  f"{mv} mV  {volts:.3f} V  "
+                  f"{temp:.1f}°C  {press:.1f} hPa  {hum:.0f}%")
 
             if args.cutoff and mv < args.cutoff:
                 print(f"Voltage {mv} mV below cutoff {args.cutoff} mV — stopping.")
