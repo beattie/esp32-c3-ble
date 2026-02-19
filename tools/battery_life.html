@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32-C3 Battery Monitor</title>
+<meta name="theme-color" content="#1a1a2e">
+<link rel="manifest" href="manifest.json">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 12px;
+  }
+  h1 { font-size: 1.2em; text-align: center; margin-bottom: 8px; color: #8be9fd; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .controls button, .controls select, .controls input {
+    padding: 10px 16px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    background: #16213e;
+    color: #e0e0e0;
+    font-size: 0.95em;
+    cursor: pointer;
+  }
+  .controls button:active { background: #0f3460; }
+  .controls button.active { background: #0f3460; border-color: #8be9fd; }
+  .controls input { width: 80px; }
+  .controls label { display: flex; align-items: center; gap: 6px; padding: 10px 8px; }
+  #connectBtn { background: #0f3460; border-color: #8be9fd; flex-grow: 1; }
+  #connectBtn.connected { background: #1b4332; border-color: #52b788; }
+  .status { text-align: center; font-size: 0.85em; color: #888; margin-bottom: 12px; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .card {
+    background: #16213e;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .card .label { font-size: 0.75em; color: #888; text-transform: uppercase; }
+  .card .value { font-size: 1.5em; font-weight: bold; margin-top: 4px; }
+  .card.battery .value { color: #50fa7b; }
+  .card.temp .value { color: #ff6e6e; }
+  .card.pressure .value { color: #8be9fd; }
+  .card.humidity .value { color: #bd93f9; }
+  .log-section { margin-bottom: 12px; }
+  .log-section h2 {
+    font-size: 0.9em; color: #888; margin-bottom: 6px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .log-section h2 button {
+    padding: 4px 10px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #16213e;
+    color: #e0e0e0;
+    font-size: 0.85em;
+    cursor: pointer;
+  }
+  #logTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75em;
+    font-family: monospace;
+  }
+  #logTable th, #logTable td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #2a2a4a;
+    text-align: right;
+  }
+  #logTable th { color: #888; position: sticky; top: 0; background: #1a1a2e; }
+  #logTable td:first-child, #logTable th:first-child { text-align: left; }
+  .log-container {
+    max-height: 40vh;
+    overflow-y: auto;
+    border: 1px solid #2a2a4a;
+    border-radius: 6px;
+  }
+  .error { color: #ff6e6e; text-align: center; font-size: 0.85em; margin: 8px 0; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<h1>ESP32-C3 Battery Monitor</h1>
+
+<div class="controls">
+  <button id="connectBtn" onclick="toggleConnection()">Connect</button>
+  <button id="loggingBtn" onclick="toggleLogging()" disabled>Start Logging</button>
+  <label>
+    Interval
+    <input type="number" id="interval" value="3600" min="10" step="10">s
+  </label>
+  <label>
+    <input type="checkbox" id="keepAwake"> Screen On
+  </label>
+</div>
+
+<div class="status" id="status">Not connected</div>
+<div class="error hidden" id="error"></div>
+
+<div class="cards">
+  <div class="card battery">
+    <div class="label">Battery</div>
+    <div class="value" id="battValue">-- mV</div>
+  </div>
+  <div class="card temp">
+    <div class="label">Temperature</div>
+    <div class="value" id="tempValue">--.- &deg;C</div>
+  </div>
+  <div class="card pressure">
+    <div class="label">Pressure</div>
+    <div class="value" id="pressValue">--.- hPa</div>
+  </div>
+  <div class="card humidity">
+    <div class="label">Humidity</div>
+    <div class="value" id="humValue">--.- %</div>
+  </div>
+</div>
+
+<div class="log-section">
+  <h2>
+    <span>Log (<span id="logCount">0</span> readings)</span>
+    <span>
+      <button onclick="exportCSV()">Export CSV</button>
+      <button onclick="clearLog()">Clear</button>
+    </span>
+  </h2>
+  <div class="log-container">
+    <table id="logTable">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Min</th>
+          <th>mV</th>
+          <th>&deg;C</th>
+          <th>hPa</th>
+          <th>%RH</th>
+        </tr>
+      </thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const SERVICE_UUID    = 'deadbeef-1000-2000-3000-aabbccddeeff';
+const BATT_UUID       = 'deadbeef-1007-2000-3000-aabbccddeeff';
+const TEMP_UUID       = 'deadbeef-1003-2000-3000-aabbccddeeff';
+const PRESS_UUID      = 'deadbeef-1002-2000-3000-aabbccddeeff';
+const HUM_UUID        = 'deadbeef-1004-2000-3000-aabbccddeeff';
+
+let device = null;
+let server = null;
+let service = null;
+let logging = false;
+let logTimer = null;
+let logData = [];
+let startTime = null;
+let wakeLock = null;
+
+const $ = id => document.getElementById(id);
+
+function setStatus(msg) { $('status').textContent = msg; }
+function setError(msg) {
+  const el = $('error');
+  if (msg) { el.textContent = msg; el.classList.remove('hidden'); }
+  else { el.classList.add('hidden'); }
+}
+
+function tsNow() {
+  return new Date().toLocaleTimeString('en-GB', { hour12: false });
+}
+
+async function toggleConnection() {
+  if (device && device.gatt.connected) {
+    device.gatt.disconnect();
+    return;
+  }
+  setError('');
+  setStatus('Scanning...');
+  try {
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'ESP32-C3-BLE' }],
+      optionalServices: [SERVICE_UUID],
+    });
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    setStatus('Connecting...');
+    server = await device.gatt.connect();
+    service = await server.getPrimaryService(SERVICE_UUID);
+    $('connectBtn').textContent = 'Disconnect';
+    $('connectBtn').classList.add('connected');
+    $('loggingBtn').disabled = false;
+    setStatus('Connected to ' + device.name);
+    await readOnce();
+  } catch (e) {
+    setError(e.message);
+    setStatus('Not connected');
+  }
+}
+
+function onDisconnected() {
+  $('connectBtn').textContent = 'Connect';
+  $('connectBtn').classList.remove('connected');
+  $('loggingBtn').disabled = true;
+  if (logging) toggleLogging();
+  setStatus('Disconnected');
+  device = null;
+  server = null;
+  service = null;
+}
+
+async function reconnect() {
+  if (!device) return false;
+  try {
+    setStatus('Reconnecting...');
+    server = await device.gatt.connect();
+    service = await server.getPrimaryService(SERVICE_UUID);
+    $('connectBtn').textContent = 'Disconnect';
+    $('connectBtn').classList.add('connected');
+    setStatus('Reconnected to ' + device.name);
+    return true;
+  } catch (e) {
+    setError(tsNow() + ' Reconnect failed: ' + e.message);
+    return false;
+  }
+}
+
+async function readCharFloat(uuid) {
+  const chr = await service.getCharacteristic(uuid);
+  const val = await chr.readValue();
+  return val.getFloat32(0, true);
+}
+
+async function readCharUint32(uuid) {
+  const chr = await service.getCharacteristic(uuid);
+  const val = await chr.readValue();
+  return val.getUint32(0, true);
+}
+
+async function readOnce() {
+  try {
+    const mv = await readCharUint32(BATT_UUID) * 2;
+    const temp = await readCharFloat(TEMP_UUID);
+    const press = await readCharFloat(PRESS_UUID) / 100.0;
+    const hum = await readCharFloat(HUM_UUID);
+
+    $('battValue').textContent = mv + ' mV';
+    $('tempValue').innerHTML = temp.toFixed(1) + ' &deg;C';
+    $('pressValue').textContent = press.toFixed(1) + ' hPa';
+    $('humValue').textContent = hum.toFixed(1) + ' %';
+
+    return { mv, temp, press, hum };
+  } catch (e) {
+    setError(tsNow() + ' Read error: ' + e.message);
+    return null;
+  }
+}
+
+function toggleLogging() {
+  if (logging) {
+    logging = false;
+    if (logTimer) { clearTimeout(logTimer); logTimer = null; }
+    $('loggingBtn').textContent = 'Start Logging';
+    $('loggingBtn').classList.remove('active');
+    setStatus('Logging stopped. ' + logData.length + ' readings.');
+    releaseWakeLock();
+  } else {
+    logging = true;
+    startTime = startTime || Date.now();
+    $('loggingBtn').textContent = 'Stop Logging';
+    $('loggingBtn').classList.add('active');
+    setStatus('Logging...');
+    acquireWakeLock();
+    logOnce();
+  }
+}
+
+async function logOnce() {
+  if (!logging) return;
+
+  // Reconnect if needed
+  if (!server || !server.connected) {
+    const ok = await reconnect();
+    if (!ok) {
+      scheduleNext();
+      return;
+    }
+  }
+
+  const result = await readOnce();
+  if (result) {
+    const now = new Date();
+    const elapsed = ((now.getTime() - startTime) / 60000).toFixed(1);
+    const ts = now.toLocaleTimeString('en-GB', { hour12: false });
+    const entry = { ts, elapsed, ...result };
+    logData.push(entry);
+
+    const row = document.createElement('tr');
+    row.innerHTML =
+      '<td>' + ts + '</td>' +
+      '<td>' + elapsed + '</td>' +
+      '<td>' + result.mv + '</td>' +
+      '<td>' + result.temp.toFixed(1) + '</td>' +
+      '<td>' + result.press.toFixed(1) + '</td>' +
+      '<td>' + result.hum.toFixed(0) + '</td>';
+    $('logBody').prepend(row);
+    $('logCount').textContent = logData.length;
+    setStatus('Logging... ' + logData.length + ' readings');
+  }
+  scheduleNext();
+}
+
+function scheduleNext() {
+  if (!logging) return;
+  const interval = parseInt($('interval').value) || 3600;
+  logTimer = setTimeout(logOnce, interval * 1000);
+}
+
+function exportCSV() {
+  if (logData.length === 0) { setError('No data to export'); return; }
+  let csv = 'timestamp,elapsed_min,mv,volts,temp_c,press_hpa,humidity\n';
+  for (const d of logData) {
+    csv += d.ts + ',' + d.elapsed + ',' + d.mv + ',' +
+           (d.mv / 1000).toFixed(3) + ',' +
+           d.temp.toFixed(2) + ',' + d.press.toFixed(2) + ',' +
+           d.hum.toFixed(1) + '\n';
+  }
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'battery_log_' +
+    new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+}
+
+function clearLog() {
+  logData = [];
+  $('logBody').innerHTML = '';
+  $('logCount').textContent = '0';
+  startTime = null;
+}
+
+async function acquireWakeLock() {
+  if (!$('keepAwake').checked) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (e) {
+    console.log('Wake lock failed:', e);
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
+$('keepAwake').addEventListener('change', () => {
+  if ($('keepAwake').checked && logging) acquireWakeLock();
+  else releaseWakeLock();
+});
+
+// Re-acquire wake lock when page becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && logging && $('keepAwake').checked) {
+    acquireWakeLock();
+  }
+});
+</script>
+
+</body>
+</html>

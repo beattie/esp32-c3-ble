@@ -1,0 +1,9 @@
+{
+  "name": "ESP32-C3 Battery Monitor",
+  "short_name": "BattMon",
+  "start_url": "battery_life.html",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": []
+}
