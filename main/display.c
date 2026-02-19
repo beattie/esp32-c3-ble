@@ -25,6 +25,7 @@
 
 static const char *TAG = "display";
 static esp_lcd_panel_handle_t panel;
+static esp_lcd_panel_io_handle_t panel_io;
 static i2c_master_bus_handle_t i2c_bus;
 
 /* ---- 8x8 font (column-major, LSB = top pixel) -------------------------- */
@@ -109,6 +110,7 @@ static bool display_is_on = false;
 
 void display_set_enabled(bool enabled)
 {
+    if (enabled == display_is_on) return;
     display_is_on = enabled;
     if (enabled) {
         ESP_LOGD(TAG, "Display enabled");
@@ -241,10 +243,12 @@ static void display_task(void *param)
     while (1) {
         button_poll(); /* Update button state */
         if (button_time != last_button) {
+            /* New button press — always render immediately */
             last_button = button_time;
             render_display();
             count = 0;
-        } else if (++count >= 3) {
+        } else if (display_is_on && ++count >= 3) {
+            /* Only re-render periodically while display is on */
             render_display();
             count = 0;
         }
@@ -271,7 +275,6 @@ esp_err_t display_init(void)
     ESP_LOGI(TAG, "I2C initialized on SDA=%d, SCL=%d", I2C_SDA_GPIO, I2C_SCL_GPIO);
 
     /* LCD panel IO over I2C */
-    esp_lcd_panel_io_handle_t io_handle = NULL;
     esp_lcd_panel_io_i2c_config_t io_config = {
         .dev_addr = LCD_I2C_ADDR,
         .scl_speed_hz = 400000,
@@ -280,7 +283,7 @@ esp_err_t display_init(void)
         .lcd_param_bits = 8,
         .dc_bit_offset = 6,
     };
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(i2c_bus, &io_config, &io_handle));
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(i2c_bus, &io_config, &panel_io));
 
     /* SSD1306 panel driver */
     esp_lcd_panel_dev_config_t panel_config = {
@@ -291,18 +294,18 @@ esp_err_t display_init(void)
         .height = LCD_V_RES,
     };
     panel_config.vendor_config = &ssd1306_config;
-    ESP_ERROR_CHECK(esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel));
+    ESP_ERROR_CHECK(esp_lcd_new_panel_ssd1306(panel_io, &panel_config, &panel));
 
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel));
     ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel, true, true));
     //ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel, true));
     uint8_t contrast = 0xFF;
-    esp_lcd_panel_io_tx_param(io_handle, 0x81, &contrast, 1);
+    esp_lcd_panel_io_tx_param(panel_io, 0x81, &contrast, 1);
     uint8_t precharge = 0xF1;
-    esp_lcd_panel_io_tx_param(io_handle, 0xD9, &precharge, 1);
+    esp_lcd_panel_io_tx_param(panel_io, 0xD9, &precharge, 1);
     uint8_t vcomh = 0x40;
-    esp_lcd_panel_io_tx_param(io_handle, 0xDB, &vcomh, 1);
+    esp_lcd_panel_io_tx_param(panel_io, 0xDB, &vcomh, 1);
     ESP_LOGI(TAG, "SSD1306 initialized via esp_lcd");
 
     xTaskCreate(display_task, "display_task", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);

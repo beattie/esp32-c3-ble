@@ -46,7 +46,7 @@ static void sensor_task(void *param)
         gatt_svc_battery_mv = battery_get_voltage_mv(); // Update battery 
                                                         // voltage reading
         
-        vTaskDelay(pdMS_TO_TICKS(30000));
+        vTaskDelay(pdMS_TO_TICKS(120000));
     }
 }
 
