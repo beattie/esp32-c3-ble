@@ -303,6 +303,7 @@ async function logOnce() {
     const ts = now.toLocaleTimeString('en-GB', { hour12: false });
     const entry = { ts, elapsed, ...result };
     logData.push(entry);
+    saveLog();
 
     const row = document.createElement('tr');
     row.innerHTML =
@@ -344,9 +345,43 @@ function exportCSV() {
 
 function clearLog() {
   logData = [];
+  startTime = null;
+  saveLog();
   $('logBody').innerHTML = '';
   $('logCount').textContent = '0';
-  startTime = null;
+}
+
+function saveLog() {
+  try {
+    localStorage.setItem('battmon_log', JSON.stringify(logData));
+    localStorage.setItem('battmon_start', startTime);
+  } catch (e) { /* storage full — data still in memory */ }
+}
+
+function loadLog() {
+  try {
+    const saved = localStorage.getItem('battmon_log');
+    const savedStart = localStorage.getItem('battmon_start');
+    if (!saved) return;
+    logData = JSON.parse(saved);
+    startTime = savedStart ? Number(savedStart) : null;
+    if (logData.length === 0) return;
+    $('logCount').textContent = logData.length;
+    // Rebuild table (newest first)
+    for (let i = logData.length - 1; i >= 0; i--) {
+      const d = logData[i];
+      const row = document.createElement('tr');
+      row.innerHTML =
+        '<td>' + d.ts + '</td>' +
+        '<td>' + d.elapsed + '</td>' +
+        '<td>' + d.mv + '</td>' +
+        '<td>' + d.temp.toFixed(1) + '</td>' +
+        '<td>' + d.press.toFixed(1) + '</td>' +
+        '<td>' + d.hum.toFixed(0) + '</td>';
+      $('logBody').appendChild(row);
+    }
+    setStatus('Restored ' + logData.length + ' readings from previous session');
+  } catch (e) { /* corrupt data — start fresh */ }
 }
 
 async function acquireWakeLock() {
@@ -367,6 +402,9 @@ $('keepAwake').addEventListener('change', () => {
   if ($('keepAwake').checked && logging) acquireWakeLock();
   else releaseWakeLock();
 });
+
+// Restore previous session data
+loadLog();
 
 // Re-acquire wake lock when page becomes visible again
 document.addEventListener('visibilitychange', () => {
