@@ -46,12 +46,12 @@ DISPLAY_MODES = {"normal": 0, "button": 1, "blank": 2}
 async def connect():
     """Scan and connect, returning a BleakClient context manager."""
     print(f"Scanning for {DEVICE_NAME}...")
-    device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10)
+    device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=20)
     if not device:
         print("Device not found. Is it advertising?")
         sys.exit(1)
     print(f"Found: {device.name} [{device.address}]")
-    return BleakClient(device)
+    return BleakClient(device, timeout=20)
 
 
 async def test_readwrite():
